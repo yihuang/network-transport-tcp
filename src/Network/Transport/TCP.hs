@@ -509,19 +509,21 @@ data TransportInternals = TransportInternals
 
 -- | Create a TCP transport
 createTransport :: N.HostName
+                -> N.HostName
                 -> N.ServiceName
                 -> TCPParameters
                 -> IO (Either IOException Transport)
-createTransport host port params =
-  either Left (Right . fst) <$> createTransportExposeInternals host port params
+createTransport bindHost externalHost port params =
+  either Left (Right . fst) <$> createTransportExposeInternals bindHost externalHost port params
 
 -- | You should probably not use this function (used for unit testing only)
 createTransportExposeInternals
   :: N.HostName
+  -> N.HostName
   -> N.ServiceName
   -> TCPParameters
   -> IO (Either IOException (Transport, TransportInternals))
-createTransportExposeInternals host port params = do
+createTransportExposeInternals bindHost externalHost port params = do
     state <- newMVar . TransportValid $ ValidTransportState
       { _localEndPoints = Map.empty
       , _nextEndPointId = 0
@@ -538,12 +540,12 @@ createTransportExposeInternals host port params = do
        -- construct a transport. So we tie a recursive knot.
        (port', result) <- do
          let transport = TCPTransport { transportState  = state
-                                      , transportHost   = host
+                                      , transportHost   = externalHost
                                       , transportPort   = port'
                                       , transportParams = params
                                       }
          bracketOnError (forkServer
-                             host
+                             bindHost
                              port
                              (tcpBacklog params)
                              (tcpReuseServerAddr params)
